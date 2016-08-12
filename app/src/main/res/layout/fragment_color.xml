@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.wq.freeze.wechatswipe.swipeback.DragBackLayout
+    android:id="@+id/drag_back"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:text="Since these annotations are metadata annotations, your project will compile even if you violate rules defined by them. However, it will be highlighted by Android Studio and Lint, and will be visible to other team members in your Continuous Integration tool output."
+        android:textSize="28sp"/>
+
+    <Button
+        android:id="@+id/add_fragment"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="add a fragment in fragment"/>
+
+    <ImageView
+        android:id="@+id/android"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        app:srcCompat="@drawable/animated_android"/>
+</com.wq.freeze.wechatswipe.swipeback.DragBackLayout>

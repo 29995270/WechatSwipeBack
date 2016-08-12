@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.wq.freeze.wechatswipe.swipeback.DragBackLayout
+    android:id="@+id/drag_back"
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    tools:context="com.wq.freeze.wechatswipe.MainActivity">
+
+    <TextView
+        android:id="@+id/text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textSize="28sp"
+        android:text="A lot of us already know that the AndroidManifest.xml you see in the text editor is not always the same as the one that will be included in the application build. It happens mainly because the libraries you are including in your project may contain extra elements in their manifests, which will be blended with permissions requested in your manifest file (see The Commons Blog for more details)."/>
+</com.wq.freeze.wechatswipe.swipeback.DragBackLayout>
