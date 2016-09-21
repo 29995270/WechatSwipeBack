@@ -28,6 +28,7 @@ public class SwipeBackManager {
     }
 
     public void onPostCreate(@NonNull final SwipeBackScene scene, DragLayout.DragCallback callback) {
+        if (scene.getDragBackLayout() == null) return;
         scene.getDragBackLayout().setTag(new WeakReference<>(tempPreScene));
         tempPreScene = null;
         scene.getDragBackLayout().addDragCallback(callback);
@@ -116,10 +117,7 @@ public class SwipeBackManager {
         if (dragBackLayout == null || dragBackLayout.getTag() == null || ((WeakReference) dragBackLayout.getTag()).get() == null) {
             return;
         }
-
         currentBackgroundDragBackLayout = (DragBackLayout) ((WeakReference) dragBackLayout.getTag()).get();
-
-        //todo find the previous and DragBackLayout
     }
 
     private void onDragProcess(float percent) {
