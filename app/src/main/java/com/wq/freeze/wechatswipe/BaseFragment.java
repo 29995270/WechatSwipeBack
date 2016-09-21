@@ -44,12 +44,12 @@ public class BaseFragment extends Fragment implements SwipeBackScene{
 
     @Override
     public void onDestroyView() {
-        instance.onFinishScene();
+        instance.onFinishScene(getDragBackLayout());
         super.onDestroyView();
     }
 
     protected void addFragment(Fragment fragment, @IdRes int fragmentStack) {
-        instance.onStartNewScene(((AppCompatActivity) getActivity()), fragmentStack, fragment);
+        instance.onStartNewScene(((AppCompatActivity) getActivity()), fragmentStack, fragment, getDragBackLayout());
     }
 
     public boolean canDragBack() {

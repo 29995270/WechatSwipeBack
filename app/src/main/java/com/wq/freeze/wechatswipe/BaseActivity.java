@@ -14,6 +14,7 @@ import com.wq.freeze.wechatswipe.swipeback.DragBackLayout;
 import com.wq.freeze.wechatswipe.swipeback.DragLayout;
 import com.wq.freeze.wechatswipe.swipeback.SwipeBackManager;
 import com.wq.freeze.wechatswipe.swipeback.SwipeBackScene;
+import com.wq.freeze.wechatswipe.swipeback.Utils;
 
 /**
  * Created by wangqi on 2016/8/8.
@@ -47,19 +48,36 @@ public class BaseActivity extends AppCompatActivity implements SwipeBackScene {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        Utils.convertActivityToTranslucent(this);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        App.handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                Utils.convertActivityFromTranslucent(BaseActivity.this);
+            }
+        }, 600);
+    }
+
+    @Override
     public void startActivity(Intent intent) {
         super.startActivity(intent);
-        instance.onStartNewScene(this);
+        instance.onStartNewScene(this, getDragBackLayout());
     }
 
     @Override
     public void finish() {
         super.finish();
-        instance.onFinishScene(this);
+        instance.onFinishScene(this, getDragBackLayout());
     }
 
     protected void addFragment(Fragment fragment, @IdRes int fragmentStack) {
-        instance.onStartNewScene(this, fragmentStack, fragment);
+        instance.onStartNewScene(this, fragmentStack, fragment, getDragBackLayout());
     }
 
     @Override

@@ -11,8 +11,8 @@ import android.util.AttributeSet;
 import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
-import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
+import android.view.animation.TranslateAnimation;
 import android.widget.FrameLayout;
 
 import java.util.ArrayList;
@@ -54,33 +54,6 @@ public class DragBackLayout extends FrameLayout implements DragLayout{
 
         mMinimumVelocity = (int) (MIN_FLING_VELOCITY * density);
         callbacks = new ArrayList<>();
-
-        /* only work between activity
-        addDragCallback(new DragCallback() {
-            @Override
-            public void call() {
-                if (getParent() != null && ((ViewGroup) getParent()).getId() == android.R.id.content) {
-                    ((ViewGroup) getParent()).setBackgroundColor(Color.TRANSPARENT);
-                }
-            }
-
-            @Override
-            public void onReturn() {
-                if (getParent() != null && ((ViewGroup) getParent()).getId() == android.R.id.content) {
-                    ((ViewGroup) getParent()).setBackgroundColor(Color.TRANSPARENT);
-                }
-            }
-
-            @Override
-            public void onProcessing(float percent) {
-                DragBackLayout.this.mPercent = percent;
-                if (getParent() != null && ((ViewGroup) getParent()).getId() == android.R.id.content) {
-                    ((ViewGroup) getParent()).setBackgroundColor(Color.argb((int) (0x99 * (1 - percent)), 0, 0, 0));
-                }
-                invalidate();
-            }
-        });
-        */
 
     }
 
@@ -255,11 +228,18 @@ public class DragBackLayout extends FrameLayout implements DragLayout{
     }
 
     public void startNewSceneAnimation() {
-        animate().translationX(-getMeasuredWidth()/2).setStartDelay(150).start();
+        TranslateAnimation animation = new TranslateAnimation(0, -getWidth() / 2, 0, 0);
+        animation.setDuration(400);
+        animation.setStartOffset(150);
+        startAnimation(animation);
+//        animate().translationX(-getMeasuredWidth()/2).setDuration(400).setStartDelay(150).start();
     }
 
     public void startFinishSceneAnimation() {
-        animate().translationX(0).start();
+        TranslateAnimation animation = new TranslateAnimation(-getWidth() / 2, 0, 0, 0);
+        animation.setDuration(400);
+        startAnimation(animation);
+//        animate().translationX(0).setDuration(400).start();
     }
 
     private ColorDrawable foregroundColor;
@@ -275,6 +255,7 @@ public class DragBackLayout extends FrameLayout implements DragLayout{
     public void resetForegroundColor() {
         ((ColorDrawable) foregroundColor.mutate()).setColor(Color.TRANSPARENT);
         setForeground(foregroundColor);
+        setTranslationX(0);
     }
 
     private static class MyVelocityTracker {

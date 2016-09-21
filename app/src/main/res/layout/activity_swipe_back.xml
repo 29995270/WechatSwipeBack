@@ -11,12 +11,16 @@
         android:layout_height="match_parent"
         android:background="@android:color/white">
 
-        <TextView
-            android:id="@+id/text"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="To check your manifest before the APK build, we can use a new feature presented in Android Studio 2.2: Merged Manifest Viewer. This tool will show how your AndroidManifest merges with your project dependencies based on build types, flavors, and variants. You can reach this tool by navigating to yourAndroidManifest.xml and clicking on the new Merged Manifest bottom tab."
-            android:textSize="28sp"/>
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+            <TextView
+                android:id="@+id/text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="To check your manifest before the APK build, we can use a new feature presented in Android Studio 2.2: Merged Manifest Viewer. This tool will show how your AndroidManifest merges with your project dependencies based on build types, flavors, and variants. You can reach this tool by navigating to yourAndroidManifest.xml and clicking on the new Merged Manifest bottom tab."
+                android:textSize="28sp"/>
+        </ScrollView>
 
         <Button
             android:id="@+id/add_fragment"

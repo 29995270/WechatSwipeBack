@@ -11,6 +11,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clickable="true"
         android:text="Since these annotations are metadata annotations, your project will compile even if you violate rules defined by them. However, it will be highlighted by Android Studio and Lint, and will be visible to other team members in your Continuous Integration tool output."
         android:textSize="28sp"/>
 
