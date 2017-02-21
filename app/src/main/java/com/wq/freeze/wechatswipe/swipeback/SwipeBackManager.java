@@ -3,6 +3,7 @@ package com.wq.freeze.wechatswipe.swipeback;
 import android.app.Activity;
 import android.support.annotation.IdRes;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.app.AppCompatActivity;
 
@@ -15,7 +16,6 @@ import java.lang.ref.WeakReference;
  */
 public class SwipeBackManager {
     private static SwipeBackManager instance = new SwipeBackManager();
-    private boolean finishByDrag;
 
     private DragBackLayout tempPreScene;
 
@@ -27,74 +27,42 @@ public class SwipeBackManager {
         return instance;
     }
 
-    public void onPostCreate(@NonNull final SwipeBackScene scene, DragLayout.DragCallback callback) {
+    public void onPostCreate(@NonNull final SwipeBackScene scene, @Nullable DragLayout.FinishCallback callback) {
         if (scene.getDragBackLayout() == null) return;
         scene.getDragBackLayout().setTag(new WeakReference<>(tempPreScene));
         tempPreScene = null;
-        scene.getDragBackLayout().addDragCallback(callback);
-        scene.getDragBackLayout().addDragCallback(new DragLayout.DragCallback() {
-            @Override
-            public void call() {
-                instance.onDragEnd();
-            }
-
-            @Override
-            public void onProcessing(float percent) {
-                instance.onDragProcess(percent);
-            }
-
-            @Override
-            public void onStart() {
-                instance.onDragStart(scene);
-            }
-
-            @Override
-            public void onReturn() {
-                instance.onDragReturn();
-            }
-
-            @Override
-            public void onRelease(boolean notEnough) {
-                instance.onRelease(notEnough);
-            }
-        });
+        if (callback == null) return;
+        scene.getDragBackLayout().setFinishCallback(callback);
     }
 
+    // for activity
     public void onStartNewScene(final Activity activity, DragBackLayout dragBackLayout) {
-        activity.overridePendingTransition(R.anim.activity_enter, 0);
+        activity.overridePendingTransition(0, 0);
 
         if (dragBackLayout != null) {
             tempPreScene = dragBackLayout;
-            dragBackLayout.startNewSceneAnimation();
         }
     }
 
+    // for activity
     public void onFinishScene(AppCompatActivity activity, DragBackLayout dragBackLayout) {
         if (dragBackLayout == null || dragBackLayout.getTag() == null || ((WeakReference) dragBackLayout.getTag()).get() == null) {
             return;
         }
-        activity.overridePendingTransition(0, R.anim.activity_exit);
-
-        DragBackLayout preScene = (DragBackLayout) ((WeakReference) dragBackLayout.getTag()).get();
-
-        if (preScene != null && !finishByDrag) {
-            preScene.startFinishSceneAnimation();
-        }
-        finishByDrag = false;
+        dragBackLayout.onBackPress();
     }
 
     //for fragment
     public void onStartNewScene(AppCompatActivity activity, @IdRes int fragmentStack, Fragment fragment, DragBackLayout dragBackLayout) {
         activity.getSupportFragmentManager()
                 .beginTransaction()
-                .setCustomAnimations(R.anim.activity_enter, 0, 0, R.anim.activity_exit)
+                .setCustomAnimations(R.anim.activity_freeze, R.anim.activity_freeze, R.anim.activity_freeze, R.anim.activity_freeze)
                 .add(fragmentStack, fragment, fragment.getClass().getSimpleName())
                 .addToBackStack(fragment.getClass().getSimpleName())
                 .commit();
 
         if (dragBackLayout != null) {
             tempPreScene = dragBackLayout;
-            dragBackLayout.startNewSceneAnimation();
         }
     }
 
@@ -103,46 +71,7 @@ public class SwipeBackManager {
         if (dragBackLayout == null || dragBackLayout.getTag() == null || ((WeakReference) dragBackLayout.getTag()).get() == null) {
             return;
         }
-        DragBackLayout preScene = (DragBackLayout) ((WeakReference) dragBackLayout.getTag()).get();
-        if (preScene != null && !finishByDrag) {
-            preScene.startFinishSceneAnimation();
-        }
-        finishByDrag = false;
-    }
-
-    private DragBackLayout currentBackgroundDragBackLayout;
-
-    private void onDragStart(SwipeBackScene scene) {
-        DragBackLayout dragBackLayout = scene.getDragBackLayout();
-        if (dragBackLayout == null || dragBackLayout.getTag() == null || ((WeakReference) dragBackLayout.getTag()).get() == null) {
-            return;
-        }
-        currentBackgroundDragBackLayout = (DragBackLayout) ((WeakReference) dragBackLayout.getTag()).get();
-    }
-
-    private void onDragProcess(float percent) {
-        if (currentBackgroundDragBackLayout != null) {
-            currentBackgroundDragBackLayout.updateBackgroundProcess(percent);
-        }
-    }
-
-    private void onDragEnd() {
-        if (currentBackgroundDragBackLayout != null) {
-            currentBackgroundDragBackLayout.updateBackgroundProcess(1);
-            currentBackgroundDragBackLayout = null;
-        }
-    }
-
-    private void onDragReturn() {
-        if (currentBackgroundDragBackLayout != null) {
-            currentBackgroundDragBackLayout.resetForegroundColor();
-            currentBackgroundDragBackLayout = null;
-        }
-    }
-
-    private void onRelease(boolean notEnough) {
-        if (!notEnough) {
-            finishByDrag = true;
-        }
+        dragBackLayout.setFinishCallback(null);
+        dragBackLayout.onBackPress();
     }
 }

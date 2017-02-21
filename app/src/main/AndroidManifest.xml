@@ -17,7 +17,7 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".SwipeBackActivity"
+        <activity android:name=".DemoActivity"
                   android:theme="@style/Trans.AppTheme"/>
 
     </application>

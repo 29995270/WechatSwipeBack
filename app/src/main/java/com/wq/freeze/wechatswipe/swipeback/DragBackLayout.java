@@ -5,35 +5,49 @@ import android.animation.AnimatorListenerAdapter;
 import android.animation.ObjectAnimator;
 import android.animation.ValueAnimator;
 import android.content.Context;
-import android.graphics.Color;
-import android.graphics.drawable.ColorDrawable;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.view.MotionEventCompat;
+import android.support.v4.view.VelocityTrackerCompat;
 import android.util.AttributeSet;
-import android.util.Pair;
+import android.util.Log;
 import android.view.MotionEvent;
+import android.view.VelocityTracker;
 import android.view.ViewConfiguration;
+import android.view.ViewTreeObserver;
 import android.view.animation.DecelerateInterpolator;
-import android.view.animation.TranslateAnimation;
 import android.widget.FrameLayout;
 
+import com.wq.freeze.wechatswipe.R;
+
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Created by wangqi on 2016/8/3.
  */
-public class DragBackLayout extends FrameLayout implements DragLayout{
+public class DragBackLayout extends FrameLayout implements DragLayout {
     private int scaledTouchSlop;
-    private float initTouchX;
-    private float initTouchY;
     private List<DragCallback> callbacks;
-    private float mPercent;
-    private boolean mEnable;
-    private int mMaximumVelocity;
-    private int mMinimumVelocity;
-    private MyVelocityTracker mVelocityTracker;
+    private boolean enable;
+    private int minimumFlingVelocity;
+    private VelocityTracker velocityTracker;
 
-    private static final int MIN_FLING_VELOCITY = 400; // dips
-    private int mEdgeSlop;
+    private boolean isBeingDragged;
+    private boolean animating = false;
+
+    private int edgeSlop;
+    
+    private int lastMotionX = -1;
+    private int activePointerId;
+    private float offsetX;
+    private Drawable shadow;
+    private int shadowWidth;
+    private FinishCallback finishCallback;
+
+    private boolean hasFinished;
 
     public DragBackLayout(Context context) {
         super(context);
@@ -48,141 +62,285 @@ public class DragBackLayout extends FrameLayout implements DragLayout{
     private void init(Context context) {
         ViewConfiguration viewConfiguration = ViewConfiguration.get(context);
         this.scaledTouchSlop = viewConfiguration.getScaledWindowTouchSlop();
-        mEdgeSlop = viewConfiguration.getScaledEdgeSlop() * 2;
-        this.mMaximumVelocity = viewConfiguration.getScaledMaximumFlingVelocity();
-        final float density = context.getResources().getDisplayMetrics().density;
-
-        mMinimumVelocity = (int) (MIN_FLING_VELOCITY * density);
+        edgeSlop = viewConfiguration.getScaledEdgeSlop() * 2;
+        minimumFlingVelocity = viewConfiguration.getScaledMinimumFlingVelocity();
         callbacks = new ArrayList<>();
 
+        setWillNotDraw(false);
+
+        shadow = ContextCompat.getDrawable(context, R.mipmap.drag_back_shadow_left);
+        shadowWidth = Utils.dp2px(context, 16);
     }
 
     @Override
-    public boolean onInterceptTouchEvent(MotionEvent motionEvent) {
-        if (!mEnable) return false;
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+            getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                @Override
+                public boolean onPreDraw() {
+                    getViewTreeObserver().removeOnPreDrawListener(this);
+                    if (enable) {
+                        shadow.setBounds(0, 0, shadowWidth, getHeight());
+                        animateRelease(getWidth(), 0, false, false);
+                    }
+                    return false;
+                }
+            });
+    }
 
-        if (mVelocityTracker == null) {
-            mVelocityTracker = MyVelocityTracker.obtain();
+    @Override
+    public void setTag(Object tag) {
+        super.setTag(tag);
+        if (tag != null &&
+                (tag instanceof WeakReference) &&
+                ((WeakReference) getTag()).get() != null &&
+                (((WeakReference) getTag()).get() instanceof DragBackLayout)) {
+
+            final DragBackLayout layout = (DragBackLayout) ((WeakReference) tag).get();
+            addDragCallback(new DragCallback() {
+                @Override
+                public void onArrived() {
+                    layout.updateBackgroundProcess(1);
+                }
+
+                @Override
+                public void onStart() {
+                }
+
+                @Override
+                public void onProcessing(float percent) {
+                    layout.updateBackgroundProcess(percent);
+                }
+
+                @Override
+                public void onRelease(boolean notEnough) {
+                }
+
+                @Override
+                public void onReturned() {
+                    layout.resetForegroundColor();
+                }
+            });
         }
-        mVelocityTracker.addMovement(motionEvent);
 
-        switch (motionEvent.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                if (animating) return false;
-                float x = motionEvent.getRawX();
-                if (x > mEdgeSlop) return false;
-                initTouchX = motionEvent.getRawX();
-                initTouchY = motionEvent.getRawY();
+    }
+
+    private void ensureVelocityTracker() {
+        if (velocityTracker == null) {
+            velocityTracker = VelocityTracker.obtain();
+        }
+    }
+
+    private boolean isPointInEdge(int x, int y) {
+        return x <= edgeSlop;
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(MotionEvent ev) {
+        if (!enable || animating) return false;
+        final int action = ev.getAction();
+
+        // Shortcut since we're being dragged
+        if (action == MotionEvent.ACTION_MOVE && isBeingDragged) {
+            return true;
+        }
+
+        switch (MotionEventCompat.getActionMasked(ev)) {
+            case MotionEvent.ACTION_DOWN: {
+                 isBeingDragged = false;
+                final int x = (int) ev.getX();
+                final int y = (int) ev.getY();
+                if (isPointInEdge(x, y)) {
+                    lastMotionX = x;
+                    activePointerId = ev.getPointerId(0);
+                    ensureVelocityTracker();
+                }
                 break;
-            case MotionEvent.ACTION_MOVE:
-                if (initTouchX == 0 && initTouchY == 0) return false;
-                if (motionEvent.getRawX() - initTouchX < 0) return false;
-                if (motionEvent.getRawX() - initTouchX > scaledTouchSlop && Math.abs(motionEvent.getRawY() - initTouchY) < scaledTouchSlop) {
+            }
+
+            case MotionEvent.ACTION_MOVE: {
+                final int activePointerId = this.activePointerId;
+                if (activePointerId == MotionEvent.INVALID_POINTER_ID) {
+                    // If we don't have a valid id, the touch down wasn't on content.
+                    break;
+                }
+                final int pointerIndex = ev.findPointerIndex(activePointerId);
+                if (pointerIndex == -1) {
+                    break;
+                }
+
+                final int x = (int) ev.getX(pointerIndex);
+                final int xDiff = Math.abs(x - lastMotionX);
+                if (xDiff > scaledTouchSlop && lastMotionX != -1) {
+                    isBeingDragged = true;
+                    lastMotionX = x;
+
                     for (DragCallback callback : callbacks) {
                         callback.onStart();
                     }
-                    return true;
                 }
-
                 break;
-            case MotionEvent.ACTION_UP:
+            }
+
             case MotionEvent.ACTION_CANCEL:
-                if (mVelocityTracker != null) {
-                    mVelocityTracker.recycle();
-                    mVelocityTracker = null;
+            case MotionEvent.ACTION_UP: {
+                isBeingDragged = false;
+                activePointerId = MotionEvent.INVALID_POINTER_ID;
+                if (velocityTracker != null) {
+                    velocityTracker.recycle();
+                    velocityTracker = null;
                 }
-                return false;
+                lastMotionX = -1;
+                break;
+            }
         }
 
-        return super.onInterceptTouchEvent(motionEvent);
+        if (velocityTracker != null) {
+            velocityTracker.addMovement(ev);
+        }
+
+        return isBeingDragged;
     }
 
-    private float moveFirstX = -1;
-    private boolean animating = false;
-
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
+    public boolean onTouchEvent(MotionEvent ev) {
 
-        if (!mEnable) return super.onTouchEvent(event);
+        if (!enable || animating) return super.onTouchEvent(ev);
 
-        if (mVelocityTracker == null) {
-            mVelocityTracker = MyVelocityTracker.obtain();
-        }
-        mVelocityTracker.addMovement(event);
+        switch (MotionEventCompat.getActionMasked(ev)) {
+            case MotionEvent.ACTION_DOWN: {
+                final int x = (int) ev.getX();
+                final int y = (int) ev.getY();
 
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_MOVE:
-                if (moveFirstX == -1) {
-                    moveFirstX = event.getRawX();
+                if (isPointInEdge(x, y)) {
+                    lastMotionX = x;
+                    activePointerId = ev.getPointerId(0);
+                    ensureVelocityTracker();
                 } else {
-                    float dx = event.getRawX() - moveFirstX;
-                    if (getTranslationX() + dx < 0 ) {
-                        setTranslationX(0);
+                    return false;
+                }
+                break;
+            }
+
+            case MotionEvent.ACTION_MOVE: {
+                final int activePointerIndex = ev.findPointerIndex(activePointerId);
+                if (activePointerIndex == -1) {
+                    return false;
+                }
+
+                final int x = (int) ev.getX(activePointerIndex);
+                int dx = lastMotionX - x;
+
+                if (!isBeingDragged && Math.abs(dx) > scaledTouchSlop) {
+                    isBeingDragged = true;
+                    if (dx > 0) {
+                        dx -= scaledTouchSlop;
                     } else {
-                        setTranslationX(getTranslationX() + dx);
-                        float percent = getTranslationX()/getMeasuredWidth();
+                        dx += scaledTouchSlop;
+                    }
+                    for (DragCallback callback : callbacks) {
+                        callback.onStart();
+                    }
+                }
+
+                if (isBeingDragged) {
+                    lastMotionX = x;
+                    // We're being dragged so scroll
+                    if (getOffsetX() + (-dx) < 0) {
+                        setOffsetX(0);
+                    } else {
+                        setOffsetX(getOffsetX() + (-dx));
+                        float percent = getOffsetX() / getMeasuredWidth();
                         for (DragCallback callback : callbacks) {
                             callback.onProcessing(percent);
                         }
                     }
-                    moveFirstX = event.getRawX();
                 }
                 break;
+            }
+
             case MotionEvent.ACTION_UP:
-                
-//                mVelocityTracker.computeCurrentVelocity(1000, mMaximumVelocity);
-                int initialVelocity = (int) mVelocityTracker.getXVelocity();
-                if (mVelocityTracker != null) {
-                    mVelocityTracker.recycle();
-                    mVelocityTracker = null;
-                }
+                if (velocityTracker != null) {
+                    velocityTracker.addMovement(ev);
+                    velocityTracker.computeCurrentVelocity(1000);
+                    float xvel = VelocityTrackerCompat.getXVelocity(velocityTracker,
+                            activePointerId);
 
-//                Log.v("AAA", initialVelocity + "_________" + mMinimumVelocity + "|||" + getTranslationX() + "____" + scaledTouchSlop);
-                boolean notEnough = getTranslationX() < getMeasuredWidth() / 2;
-                boolean notEnoughButFast = getTranslationX() < getMeasuredWidth() / 2 && getTranslationX() > scaledTouchSlop && initialVelocity > mMinimumVelocity;
-                for (DragCallback callback : callbacks) {
-                    callback.onRelease(notEnough);
-                }
-                if (notEnough) {
-                    if (notEnoughButFast) {
-                        animateRelease(getTranslationX(), getMeasuredWidth(), true);
-                    } else {
-                        animateRelease(getTranslationX(), 0, false);
-                    }
+                    boolean notEnough = getOffsetX() < getMeasuredWidth() / 2;
 
-                } else {
-                    animateRelease(getTranslationX(), getMeasuredWidth(), true);
-                }
-                moveFirstX = -1;
-                break;
-            case MotionEvent.ACTION_DOWN:
-                moveFirstX = -1;
-                float x = event.getRawX();
-                if (x <= mEdgeSlop) {
+                    boolean notEnoughButFast =
+                            getOffsetX() < getMeasuredWidth() / 2 &&
+                            getOffsetX() > scaledTouchSlop &&
+                                    xvel > minimumFlingVelocity;
+
                     for (DragCallback callback : callbacks) {
-                        callback.onStart();
+                        callback.onRelease(notEnough);
                     }
-                    return true;
+                    if (notEnough) {
+                        if (notEnoughButFast) {
+                            animateRelease(getOffsetX(), getMeasuredWidth(), true, true);
+                        } else {
+                            animateRelease(getOffsetX(), 0, false, true);
+                        }
+
+                    } else {
+                        animateRelease(getOffsetX(), getMeasuredWidth(), true, true);
+                    }
                 }
-                break;
-            case MotionEvent.ACTION_CANCEL:
-                if (mVelocityTracker != null) {
-                    mVelocityTracker.recycle();
-                    mVelocityTracker = null;
+                lastMotionX = -1;
+
+            case MotionEvent.ACTION_CANCEL: {
+                isBeingDragged = false;
+                activePointerId = MotionEvent.INVALID_POINTER_ID;
+                if (velocityTracker != null) {
+                    velocityTracker.recycle();
+                    velocityTracker = null;
                 }
+                lastMotionX = -1;
                 break;
+            }
         }
-        return super.onTouchEvent(event);
+
+        if (velocityTracker != null) {
+            velocityTracker.addMovement(ev);
+        }
+
+        return true;
     }
 
-    private void animateRelease(float start, float end, final boolean dragOut) {
-        ObjectAnimator animator = ObjectAnimator.ofFloat(this, "translationX", start, end);
-        animator.setDuration(300);
+    private void setOffsetX(float v) {
+        this.offsetX = v;
+        invalidate();
+    }
+
+    private float getOffsetX() {
+        return this.offsetX;
+    }
+
+    @Override
+    public void draw(Canvas canvas) {
+        canvas.save();
+        canvas.translate(offsetX, 0);
+        super.draw(canvas);
+        canvas.restore();
+
+        canvas.save();
+        canvas.translate(offsetX - shadowWidth, 0);
+        float v = (1 - (offsetX / getWidth())) * 255;
+        shadow.setAlpha(offsetX <= 0 ? 255 : (int) v);
+        shadow.draw(canvas);
+        canvas.restore();
+    }
+
+    private void animateRelease(final float start, float end, final boolean outOrIn, final boolean byDragAction) {
+        if (animating || hasFinished) return;
+        ObjectAnimator animator = ObjectAnimator.ofFloat(this, "offsetX", start, end);
+        animator.setDuration((long) (400 * Math.abs(end - start)/getWidth()));
         animator.setInterpolator(new DecelerateInterpolator());
         animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
             @Override
             public void onAnimationUpdate(ValueAnimator animation) {
-                float percent = getTranslationX()/getMeasuredWidth();
+                float percent = ((Float) animation.getAnimatedValue()) / getMeasuredWidth();
                 for (DragCallback callback : callbacks) {
                     callback.onProcessing(percent);
                 }
@@ -193,12 +351,16 @@ public class DragBackLayout extends FrameLayout implements DragLayout{
             public void onAnimationEnd(Animator animation) {
                 animating = false;
                 for (DragCallback callback : callbacks) {
-                    callback.onProcessing(dragOut? 1: 0);
-                    if (dragOut) {
-                        callback.call();
+                    callback.onProcessing(outOrIn ? 1 : 0);
+                    if (outOrIn) {
+                        callback.onArrived();
                     } else {
-                        callback.onReturn();
+                        callback.onReturned();
                     }
+                }
+                if (finishCallback != null && outOrIn) {
+                    hasFinished = true;
+                    finishCallback.onFinish();
                 }
             }
 
@@ -211,7 +373,7 @@ public class DragBackLayout extends FrameLayout implements DragLayout{
     }
 
     public void setEnable(boolean enable) {
-        this.mEnable = enable;
+        this.enable = enable;
     }
 
 
@@ -227,64 +389,21 @@ public class DragBackLayout extends FrameLayout implements DragLayout{
         this.callbacks.add(callback);
     }
 
-    public void startNewSceneAnimation() {
-        TranslateAnimation animation = new TranslateAnimation(0, -getWidth() / 2, 0, 0);
-        animation.setDuration(400);
-        animation.setStartOffset(150);
-        startAnimation(animation);
-//        animate().translationX(-getMeasuredWidth()/2).setDuration(400).setStartDelay(150).start();
+    @Override
+    public void setFinishCallback(FinishCallback callback) {
+        this.finishCallback = callback;
     }
 
-    public void startFinishSceneAnimation() {
-        TranslateAnimation animation = new TranslateAnimation(-getWidth() / 2, 0, 0, 0);
-        animation.setDuration(400);
-        startAnimation(animation);
-//        animate().translationX(0).setDuration(400).start();
+    public void onBackPress() {
+        animateRelease(0, getWidth(), true, false);
     }
 
-    private ColorDrawable foregroundColor;
-    public void updateBackgroundProcess(float percent) {
-        setTranslationX((float) (-0.5 * getMeasuredWidth() * (1 - percent)));
-        if (foregroundColor == null) {
-            foregroundColor = new ColorDrawable();
-        }
-        ((ColorDrawable) foregroundColor.mutate()).setColor(Color.argb((int) (0x99 * (1 - percent)), 0, 0, 0));
-        setForeground(foregroundColor);
+    void updateBackgroundProcess(float percent) {
+        Log.v("AAA", percent + "___" + (float) (-0.5 * getMeasuredWidth() * (1 - percent)));
+        setOffsetX((float) (-0.5 * getMeasuredWidth() * (1 - percent)));
     }
 
-    public void resetForegroundColor() {
-        ((ColorDrawable) foregroundColor.mutate()).setColor(Color.TRANSPARENT);
-        setForeground(foregroundColor);
-        setTranslationX(0);
+    void resetForegroundColor() {
+        setOffsetX(0);
     }
-
-    private static class MyVelocityTracker {
-        
-        public static MyVelocityTracker obtain() {
-            return new MyVelocityTracker();
-        }
-
-        private Pair<Long, Float> firstPair;
-        private Pair<Long, Float> lastPair;
-        private MyVelocityTracker() {
-        }
-
-        public void addMovement(MotionEvent event) {
-            if (firstPair == null) {
-                firstPair = new Pair<>(System.currentTimeMillis(), event.getRawX());
-            } else {
-                lastPair = new Pair<>(System.currentTimeMillis(), event.getRawX());
-            }
-        }
-
-        public float getXVelocity() {
-            if (firstPair == null || lastPair == null) return 0f;
-            return ((lastPair.second - firstPair.second)/(lastPair.first - firstPair.first)) * 1000;
-        }
-
-        public void recycle(){
-
-        }
-    }
-
 }

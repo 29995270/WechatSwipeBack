@@ -34,9 +34,9 @@ public class BaseFragment extends Fragment implements SwipeBackScene{
         dragBackLayout = getDragBackLayout();
         dragBackLayout.setEnable(canDragBack());
 
-        instance.onPostCreate(this, new DragLayout.DragCallback() {
+        instance.onPostCreate(this, new DragLayout.FinishCallback() {
             @Override
-            public void call() {
+            public void onFinish() {
                 getActivity().onBackPressed();
             }
         });

@@ -5,9 +5,8 @@ import android.os.Bundle;
 import android.support.annotation.IdRes;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.support.v4.content.ContextCompat;
+import android.support.v4.app.FragmentManager;
 import android.support.v7.app.AppCompatActivity;
-import android.support.v7.content.res.AppCompatResources;
 import android.util.Log;
 
 import com.wq.freeze.wechatswipe.swipeback.DragBackLayout;
@@ -35,10 +34,11 @@ public class BaseActivity extends AppCompatActivity implements SwipeBackScene {
     protected void onPostCreate(@Nullable Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
         dragBack = getDragBackLayout();
-        instance.onPostCreate(this, new DragLayout.DragCallback() {
+        instance.onPostCreate(this, new DragLayout.FinishCallback() {
             @Override
-            public void call() {
-                finish();
+            public void onFinish() {
+                BaseActivity.this.finish();
+                overridePendingTransition(0, 0);
             }
         });
 
@@ -50,18 +50,22 @@ public class BaseActivity extends AppCompatActivity implements SwipeBackScene {
     @Override
     protected void onResume() {
         super.onResume();
-        Utils.convertActivityToTranslucent(this);
+        if (canDragBack()) {
+            Utils.convertActivityToTranslucent(this);
+        }
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        App.handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                Utils.convertActivityFromTranslucent(BaseActivity.this);
-            }
-        }, 600);
+        if (canDragBack()) {
+            App.handler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    Utils.convertActivityFromTranslucent(BaseActivity.this);
+                }
+            }, 450);
+        }
     }
 
     @Override
@@ -71,9 +75,17 @@ public class BaseActivity extends AppCompatActivity implements SwipeBackScene {
     }
 
     @Override
-    public void finish() {
-        super.finish();
-        instance.onFinishScene(this, getDragBackLayout());
+    public void onBackPressed() {
+        FragmentManager manager = getSupportFragmentManager();
+        if (manager.getBackStackEntryCount() > 0) {
+            super.onBackPressed();
+        } else {
+            if (canDragBack()) {
+                instance.onFinishScene(this, getDragBackLayout());
+            } else {
+                super.onBackPressed();
+            }
+        }
     }
 
     protected void addFragment(Fragment fragment, @IdRes int fragmentStack) {

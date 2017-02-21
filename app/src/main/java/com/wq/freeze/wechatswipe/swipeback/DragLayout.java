@@ -7,11 +7,17 @@ public interface DragLayout {
 
     void addDragCallback(DragCallback callback);
 
+    void setFinishCallback(FinishCallback callback);
+
     abstract class DragCallback {
-        public abstract void call();
+        public abstract void onArrived();
         public void onStart(){}
         public void onProcessing(float percent){}
         public void onRelease(boolean notEnough){}
-        public void onReturn(){}
+        public void onReturned(){}
+    }
+
+    interface FinishCallback {
+        void onFinish();
     }
 }

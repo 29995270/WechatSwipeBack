@@ -3,8 +3,10 @@ package com.wq.freeze.wechatswipe.swipeback;
 
 import android.app.Activity;
 import android.app.ActivityOptions;
+import android.content.Context;
 import android.os.Build;
 import android.util.Log;
+import android.util.TypedValue;
 
 import java.lang.reflect.Method;
 
@@ -102,4 +104,9 @@ public class Utils {
             Log.v("AAA", t.toString());
         }
     }
+
+    public static int dp2px(Context context, float dpVal) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dpVal, context.getResources().getDisplayMetrics());
+    }
+
 }
